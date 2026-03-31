@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard · Oral Draw</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@17/dist/iife/sdk.js"></script>
+
+  <style>
+    /* ─── RESET ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+
+    /* ─── TOKENS ─────────────────────────────────────────── */
+    :root {
+      --bg:        #0e0e0e;
+      --bg2:       #161616;
+      --bg3:       #1f1f1f;
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(255,255,255,0.14);
+      --text:      #f0ece3;
+      --muted:     #7a7570;
+      --accent:    #c8b89a;
+      --accent2:   #e8dcc8;
+      --green:     #4caf7d;
+      --green-bg:  rgba(76,175,125,0.12);
+      --amber:     #d4935a;
+      --amber-bg:  rgba(212,147,90,0.12);
+      --red:       #c06060;
+      --red-bg:    rgba(192,96,96,0.12);
+      --blue:      #6b9fd4;
+      --blue-bg:   rgba(107,159,212,0.12);
+      --radius:    12px;
+      --radius-sm: 7px;
+      --serif:     'DM Serif Display', serif;
+      --sans:      'DM Sans', sans-serif;
+    }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100%;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── SCREENS ────────────────────────────────────────── */
+    .screen { display: none; animation: fadein 0.3s ease; }
+    .screen.active { display: block; }
+    @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ─── TOPBAR ─────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 0 2rem;
+      border-bottom: 0.5px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .brand {
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      color: var(--accent);
+      letter-spacing: 0.01em;
+    }
+    .brand span { color: var(--muted); font-style: italic; }
+    .user-badge {
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--bg3);
+      border: 0.5px solid var(--border);
+      padding: 5px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .user-badge:hover { border-color: var(--border2); color: var(--text); }
+
+
+
+    /* ─── LOADING ─────────────────────────────────────────── */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.3s;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 1.5px solid var(--border2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── TOAST ───────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 5.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--bg3);
+      border: 0.5px solid var(--border2);
+      border-radius: 20px;
+      padding: 9px 18px;
+      font-size: 13px;
+      color: var(--text);
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ─── MODAL ───────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 150;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg2);
+      border: 0.5px solid var(--border2);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      width: 100%;
+      max-width: 400px;
+      animation: fadein 0.2s ease;
+    }
+    .modal-title { font-family: var(--serif); font-size: 1.35rem; margin-bottom: 4px; }
+    .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 1rem; }
+    .btn-ghost {
+      flex: 1;
+      background: none;
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--sans);
+      font-size: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+    .btn-accent {
+      flex: 1;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--sans);
+      font-size: 14px;
+      font-weight: 500;
+      color: #0e0e0e;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-accent:hover { background: var(--accent2); }
+    .btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
+    .modal-err { font-size: 12px; color: var(--red); margin-top: 8px; min-height: 16px; }
+
+    /* ─── DASHBOARD LAYOUT ───────────────────────────────── */
+    .dash-wrap {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 0 1.5rem 5.5rem;
+    }
+
+    /* ─── GREETING ───────────────────────────────────────── */
+    .greeting {
+      font-family: var(--serif);
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      color: var(--text);
+      margin-bottom: 1.75rem;
+      text-align: center;
+    }
+
+    /* ─── DASHBOARD GRID ─────────────────────────────────── */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .dash-grid { grid-template-columns: 1fr 1fr; }
+      .dash-grid .widget:last-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 580px) {
+      .dash-grid { grid-template-columns: 1fr; }
+      .dash-grid .widget:last-child { grid-column: auto; }
+    }
+
+    /* ─── WIDGET CARD ────────────────────────────────────── */
+    .widget {
+      background: var(--bg2);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .widget-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0.9rem 1.25rem;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .widget-icon { font-size: 15px; flex-shrink: 0; line-height: 1; }
+    .widget-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.01em;
+    }
+    .widget-badge {
+      background: var(--accent);
+      color: #0e0e0e;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 2px 7px;
+      min-width: 20px;
+      text-align: center;
+      flex-shrink: 0;
+      font-family: var(--sans);
+    }
+    .widget-body { padding: 0.5rem 1.25rem 0.25rem; }
+
+    /* ─── EVENT ITEMS ────────────────────────────────────── */
+    .event-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 0.65rem 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .event-item:last-child { border-bottom: none; }
+    .event-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .event-dot.oral  { background: var(--blue); }
+    .event-dot.test  { background: var(--red); }
+    .event-dot.hw    { background: var(--amber); }
+    .event-dot.other { background: var(--muted); }
+    .event-info { flex: 1; min-width: 0; }
+    .event-title-text { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-sub { font-size: 11px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-date { font-size: 11px; color: var(--muted); flex-shrink: 0; text-align: right; white-space: nowrap; line-height: 1.45; }
+
+    /* ─── MESSAGE ITEMS ──────────────────────────────────── */
+    .msg-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.65rem 0;
+      border-bottom: 0.5px solid var(--border);
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: opacity 0.12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .msg-item:last-child { border-bottom: none; }
+    .msg-item:hover { opacity: 0.75; }
+    .msg-item:active { opacity: 0.55; }
+    .msg-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: var(--bg3);
+      border: 0.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .msg-body { flex: 1; min-width: 0; }
+    .msg-sender { font-size: 13px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+    .msg-sender.unread { font-weight: 600; color: var(--text); }
+    .msg-preview { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .msg-preview.unread { color: var(--text); opacity: 0.7; }
+    .msg-meta { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+    .msg-time { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .msg-unread-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    /* ─── ACTIVITY ITEMS ─────────────────────────────────── */
+    .act-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 0.65rem 0;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .act-item:last-child { border-bottom: none; }
+    .act-icon-wrap {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: var(--bg3);
+      border: 0.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .act-body { flex: 1; min-width: 0; }
+    .act-text { font-size: 13px; line-height: 1.45; color: var(--muted); }
+    .act-text strong { font-weight: 600; color: var(--text); }
+    .act-time { font-size: 11px; color: var(--muted); margin-top: 3px; opacity: 0.7; }
+
+    /* ─── EXPAND SECTION ─────────────────────────────────── */
+    .expand-btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-top: 0.5px solid var(--border);
+      padding: 10px 1.25rem;
+      font-family: var(--sans);
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      text-align: center;
+      transition: color 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      letter-spacing: 0.02em;
+    }
+    .expand-btn:hover { color: var(--text); background: rgba(255,255,255,0.025); }
+    .expand-arrow {
+      display: inline-block;
+      transition: transform 0.22s ease;
+      font-size: 11px;
+      opacity: 0.6;
+    }
+    .expand-btn.open .expand-arrow { transform: rotate(180deg); }
+    .expand-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .expand-content.open {
+      max-height: 340px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .expand-inner { padding: 0 1.25rem 0.25rem; }
+
+    /* Scrollbar in expanded panels */
+    .expand-content.open::-webkit-scrollbar { width: 3px; }
+    .expand-content.open::-webkit-scrollbar-track { background: transparent; }
+    .expand-content.open::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ─── ACCOUNT SCREEN ─────────────────────────────────── */
+    .app { max-width: 520px; margin: 0 auto; padding: 0 1.25rem 5.5rem; }
+    .new-session-btn {
+      width: 100%; background: none; border: 0.5px dashed var(--border2);
+      border-radius: var(--radius); padding: 14px; font-family: var(--sans);
+      font-size: 14px; color: var(--muted); cursor: pointer;
+      transition: border-color 0.15s, color 0.15s; margin-top: 4px;
+    }
+    .new-session-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .lang-selector { display: flex; gap: 6px; margin-top: 10px; }
+    .lang-btn {
+      flex: 1; background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: var(--radius-sm); padding: 9px 4px;
+      font-family: var(--sans); font-size: 12px; color: var(--muted);
+      cursor: pointer; transition: border-color 0.15s, color 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .lang-btn:hover { border-color: var(--border2); color: var(--text); }
+    .lang-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(200,184,154,0.07); }
+
+    /* ─── BOTTOM NAV ─────────────────────────────────────── */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--bg2);
+      border-top: 0.5px solid var(--border);
+      display: none;
+      align-items: center;
+      justify-content: space-around;
+      padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+      z-index: 80;
+    }
+    .bottom-nav.visible { display: flex; }
+    .nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      transition: opacity 0.15s;
+      opacity: 0.4;
+    }
+    .nav-btn.active { opacity: 1; }
+    .nav-btn:hover { opacity: 0.75; }
+    .nav-icon { font-size: 18px; line-height: 1; }
+    .nav-label { font-size: 10px; font-family: var(--sans); color: var(--text); letter-spacing: 0.03em; }
+
+    /* ─── RESPONSIVE PADDING ─────────────────────────────── */
+    @media (max-width: 580px) {
+      .dash-wrap { padding: 0 1rem 5.5rem; }
+      .nav-btn { padding: 4px 6px; }
+    }
+    @media (min-width: 1400px) {
+      .greeting { margin-bottom: 2rem; }
+      .dash-grid { gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" id="loading"><div class="spinner"></div></div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- CHANGE PASSWORD MODAL -->
+  <div class="modal-overlay" id="pw-modal">
+    <div class="modal">
+      <div class="modal-title">Change password</div>
+      <div class="modal-sub">Choose a new password for your account.</div>
+      <div class="field">
+        <label>Current password</label>
+        <input type="password" id="modal-old-pw" placeholder="••••••••" />
+      </div>
+      <div class="field">
+        <label>New password</label>
+        <input type="password" id="modal-new-pw" placeholder="8+ characters" />
+      </div>
+      <div class="field">
+        <label>Confirm new password</label>
+        <input type="password" id="modal-confirm-pw" placeholder="repeat new password" />
+      </div>
+      <div class="modal-err" id="modal-err"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closePwModal()">Cancel</button>
+        <button class="btn-accent" id="modal-save-btn" onclick="changePassword()">Save</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- ════════════════════════════════════════════════════════
+       DASHBOARD SCREEN
+       ════════════════════════════════════════════════════════ -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="dash-wrap">
+
+      <div class="topbar">
+        <div class="brand">Oral <span>Draw</span></div>
+        <div class="user-badge" id="user-badge" onclick="openPwModal()">⋯</div>
+      </div>
+
+      <h1 class="greeting" id="greeting">Jó napot</h1>
+
+      <div class="dash-grid">
+
+        <!-- ─── KÖZELGŐ ESEMÉNYEK ──────────────────────────── -->
+        <div class="widget">
+          <div class="widget-header">
+            <span class="widget-icon">📅</span>
+            <span class="widget-title">Közelgő események</span>
+          </div>
+          <div class="widget-body">
+
+            <div class="event-item">
+              <div class="event-dot oral"></div>
+              <div class="event-info">
+                <div class="event-title-text">Szóbeli felelés</div>
+                <div class="event-sub">Történelem · A dualizmus kora</div>
+              </div>
+              <div class="event-date">holnap<br>08:05</div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-dot test"></div>
+              <div class="event-info">
+                <div class="event-title-text">Dolgozat</div>
+                <div class="event-sub">Matematika · Algebrai azonosságok</div>
+              </div>
+              <div class="event-date">3 nap<br>múlva</div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-dot hw"></div>
+              <div class="event-info">
+                <div class="event-title-text">Beadandó</div>
+                <div class="event-sub">Irodalom · Petőfi-esszé</div>
+              </div>
+              <div class="event-date">péntek<br>23:59</div>
+            </div>
+
+            <div class="event-item">
+              <div class="event-dot oral"></div>
+              <div class="event-info">
+                <div class="event-title-text">Szóbeli felelés</div>
+                <div class="event-sub">Történelem · Az első vh. kitörése</div>
+              </div>
+              <div class="event-date">7 nap<br>múlva</div>
+            </div>
+
+          </div>
+
+          <button class="expand-btn" id="events-expand-btn" onclick="toggleExpand('events')">
+            <span>További események</span>
+            <span class="expand-arrow">▾</span>
+          </button>
+          <div class="expand-content" id="events-expand">
+            <div class="expand-inner">
+
+              <div class="event-item">
+                <div class="event-dot test"></div>
+                <div class="event-info">
+                  <div class="event-title-text">Röpdolgozat</div>
+                  <div class="event-sub">Fizika · Kinematika</div>
+                </div>
+                <div class="event-date">8 nap<br>múlva</div>
+              </div>
+
+              <div class="event-item">
+                <div class="event-dot oral"></div>
+                <div class="event-info">
+                  <div class="event-title-text">Szóbeli felelés</div>
+                  <div class="event-sub">Történelem · A Tanácsköztársaság</div>
+                </div>
+                <div class="event-date">10 nap<br>múlva</div>
+              </div>
+
+              <div class="event-item">
+                <div class="event-dot hw"></div>
+                <div class="event-info">
+                  <div class="event-title-text">Beadandó</div>
+                  <div class="event-sub">Kémia · Reakcióegyenletek</div>
+                </div>
+                <div class="event-date">12 nap<br>múlva</div>
+              </div>
+
+              <div class="event-item">
+                <div class="event-dot other"></div>
+                <div class="event-info">
+                  <div class="event-title-text">Osztálykirándulás</div>
+                  <div class="event-sub">Tájékoztató szülőknek is</div>
+                </div>
+                <div class="event-date">14 nap<br>múlva</div>
+              </div>
+
+              <div class="event-item">
+                <div class="event-dot oral"></div>
+                <div class="event-info">
+                  <div class="event-title-text">Szóbeli felelés</div>
+                  <div class="event-sub">Történelem · A Horthy-rendszer</div>
+                </div>
+                <div class="event-date">18 nap<br>múlva</div>
+              </div>
+
+            </div>
+          </div>
+        </div><!-- /.widget közelgő -->
+
+
+        <!-- ─── ÜZENETEK ───────────────────────────────────── -->
+        <div class="widget">
+          <div class="widget-header">
+            <span class="widget-icon">✉️</span>
+            <span class="widget-title">Üzenetek</span>
+            <span class="widget-badge" id="unread-badge">3</span>
+          </div>
+          <div class="widget-body">
+
+            <!-- OLVASATLAN -->
+            <!-- TODO: href="chat.html#nagy-anna" — a chat oldal Nagy Anna beszélgetésére visz -->
+            <a class="msg-item" href="#" onclick="return false;">
+              <div class="msg-avatar" style="background:var(--green-bg);border-color:rgba(76,175,125,0.3);color:var(--green);">NA</div>
+              <div class="msg-body">
+                <div class="msg-sender unread">Nagy Anna</div>
+                <div class="msg-preview unread">Meg tudod nekem küldeni a matekos feladatokat?</div>
+              </div>
+              <div class="msg-meta">
+                <div class="msg-time">10 perce</div>
+                <div class="msg-unread-dot"></div>
+              </div>
+            </a>
+
+            <!-- OLVASATLAN -->
+            <!-- TODO: href="chat.html#kiss-marton-tanar" — tanár üzenetére visz -->
+            <a class="msg-item" href="#" onclick="return false;">
+              <div class="msg-avatar" style="background:var(--blue-bg);border-color:rgba(107,159,212,0.3);color:var(--blue);">KM</div>
+              <div class="msg-body">
+                <div class="msg-sender unread">Kiss Márton tanár</div>
+                <div class="msg-preview unread">A holnapi dolgozat anyaga megváltozott.</div>
+              </div>
+              <div class="msg-meta">
+                <div class="msg-time">2 órája</div>
+                <div class="msg-unread-dot"></div>
+              </div>
+            </a>
+
+            <!-- OLVASATLAN (csoportüzenet) -->
+            <!-- TODO: href="chat.html#osztaly-csoport" — osztálycsoport chatjére visz -->
+            <a class="msg-item" href="#" onclick="return false;">
+              <div class="msg-avatar" style="background:var(--amber-bg);border-color:rgba(212,147,90,0.3);color:var(--amber);">9G</div>
+              <div class="msg-body">
+                <div class="msg-sender unread">9/G csoport</div>
+                <div class="msg-preview unread">Fekete Dávid: Ki jön holnap edzésre?</div>
+              </div>
+              <div class="msg-meta">
+                <div class="msg-time">3 órája</div>
+                <div class="msg-unread-dot"></div>
+              </div>
+            </a>
+
+            <!-- OLVASOTT -->
+            <!-- TODO: href="chat.html#toth-peter" — Tóth Péter chatjére visz -->
+            <a class="msg-item" href="#" onclick="return false;">
+              <div class="msg-avatar">TP</div>
+              <div class="msg-body">
+                <div class="msg-sender">Tóth Péter</div>
+                <div class="msg-preview">Okés, holnap megcsinálom.</div>
+              </div>
+              <div class="msg-meta">
+                <div class="msg-time">tegnap</div>
+              </div>
+            </a>
+
+          </div>
+
+          <button class="expand-btn" id="msgs-expand-btn" onclick="toggleExpand('msgs')">
+            <span>További üzenetek</span>
+            <span class="expand-arrow">▾</span>
+          </button>
+          <div class="expand-content" id="msgs-expand">
+            <div class="expand-inner">
+
+              <!-- TODO: href="chat.html#varga-lili" -->
+              <a class="msg-item" href="#" onclick="return false;">
+                <div class="msg-avatar">VL</div>
+                <div class="msg-body">
+                  <div class="msg-sender">Varga Lili</div>
+                  <div class="msg-preview">Mikor van az osztálykirándulás pontos időpontja?</div>
+                </div>
+                <div class="msg-meta"><div class="msg-time">tegnap</div></div>
+              </a>
+
+              <!-- TODO: href="chat.html#simon-mark" -->
+              <a class="msg-item" href="#" onclick="return false;">
+                <div class="msg-avatar">SM</div>
+                <div class="msg-body">
+                  <div class="msg-sender">Simon Márk</div>
+                  <div class="msg-preview">Köszönöm a segítséget!</div>
+                </div>
+                <div class="msg-meta"><div class="msg-time">2 napja</div></div>
+              </a>
+
+              <!-- TODO: href="chat.html#fekete-david" -->
+              <a class="msg-item" href="#" onclick="return false;">
+                <div class="msg-avatar">FD</div>
+                <div class="msg-body">
+                  <div class="msg-sender">Fekete Dávid</div>
+                  <div class="msg-preview">Látod a bejegyzésemet a csoportban?</div>
+                </div>
+                <div class="msg-meta"><div class="msg-time">3 napja</div></div>
+              </a>
+
+              <!-- TODO: href="chat.html#horvath-eszter" -->
+              <a class="msg-item" href="#" onclick="return false;">
+                <div class="msg-avatar">HE</div>
+                <div class="msg-body">
+                  <div class="msg-sender">Horváth Eszter</div>
+                  <div class="msg-preview">Elküldöm a biosz vázlatot estére.</div>
+                </div>
+                <div class="msg-meta"><div class="msg-time">4 napja</div></div>
+              </a>
+
+              <!-- TODO: href="chat.html#tanari-iroda" -->
+              <a class="msg-item" href="#" onclick="return false;">
+                <div class="msg-avatar" style="background:var(--blue-bg);border-color:rgba(107,159,212,0.3);color:var(--blue);">TO</div>
+                <div class="msg-body">
+                  <div class="msg-sender">Tóth Orsolya tanár</div>
+                  <div class="msg-preview">A péntek délelőtti óra elmarad.</div>
+                </div>
+                <div class="msg-meta"><div class="msg-time">5 napja</div></div>
+              </a>
+
+            </div>
+          </div>
+        </div><!-- /.widget üzenetek -->
+
+
+        <!-- ─── LEGUTÓBBI TEVÉKENYSÉGEK ────────────────────── -->
+        <div class="widget">
+          <div class="widget-header">
+            <span class="widget-icon">⚡</span>
+            <span class="widget-title">Legutóbbi tevékenységek</span>
+          </div>
+          <div class="widget-body">
+
+            <div class="act-item">
+              <div class="act-icon-wrap">🙋</div>
+              <div class="act-body">
+                <div class="act-text"><strong>Nagy Anna</strong> bevállalt egy szóbeli felelést — Történelem</div>
+                <div class="act-time">12 perce</div>
+              </div>
+            </div>
+
+            <div class="act-item">
+              <div class="act-icon-wrap">📝</div>
+              <div class="act-body">
+                <div class="act-text"><strong>Kiss Márton tanár</strong> új dolgozatot hirdetett meg — Matematika</div>
+                <div class="act-time">2 órája</div>
+              </div>
+            </div>
+
+            <div class="act-item">
+              <div class="act-icon-wrap">✅</div>
+              <div class="act-body">
+                <div class="act-text"><strong>Simon Márk</strong> beküldte a beadandóját — Irodalom esszé</div>
+                <div class="act-time">4 órája</div>
+              </div>
+            </div>
+
+            <div class="act-item">
+              <div class="act-icon-wrap">🎲</div>
+              <div class="act-body">
+                <div class="act-text"><strong>Tóth Péter</strong> lett kisorsolt — márc. 22-i Történelem felelés</div>
+                <div class="act-time">tegnap</div>
+              </div>
+            </div>
+
+            <div class="act-item">
+              <div class="act-icon-wrap">🔒</div>
+              <div class="act-body">
+                <div class="act-text">A <strong>márc. 26-i sorsolás</strong> lezárult — jelentkezések zárva</div>
+                <div class="act-time">tegnap</div>
+              </div>
+            </div>
+
+          </div>
+
+          <button class="expand-btn" id="acts-expand-btn" onclick="toggleExpand('acts')">
+            <span>További tevékenységek</span>
+            <span class="expand-arrow">▾</span>
+          </button>
+          <div class="expand-content" id="acts-expand">
+            <div class="expand-inner">
+
+              <div class="act-item">
+                <div class="act-icon-wrap">🙋</div>
+                <div class="act-body">
+                  <div class="act-text"><strong>Fekete Dávid</strong> bevállalt egy szóbeli felelést — Történelem</div>
+                  <div class="act-time">2 napja</div>
+                </div>
+              </div>
+
+              <div class="act-item">
+                <div class="act-icon-wrap">📋</div>
+                <div class="act-body">
+                  <div class="act-text"><strong>Varga Lili</strong> új feladatot kapott — Kémia beadandó (ápr. 6.)</div>
+                  <div class="act-time">2 napja</div>
+                </div>
+              </div>
+
+              <div class="act-item">
+                <div class="act-icon-wrap">🙋</div>
+                <div class="act-body">
+                  <div class="act-text"><strong>Simon Márk</strong> bevállalt egy szóbeli felelést — Történelem</div>
+                  <div class="act-time">3 napja</div>
+                </div>
+              </div>
+
+              <div class="act-item">
+                <div class="act-icon-wrap">✅</div>
+                <div class="act-body">
+                  <div class="act-text"><strong>Horváth Eszter</strong> beküldte a biológia vázlatot</div>
+                  <div class="act-time">4 napja</div>
+                </div>
+              </div>
+
+              <div class="act-item">
+                <div class="act-icon-wrap">📝</div>
+                <div class="act-body">
+                  <div class="act-text"><strong>Kiss Márton tanár</strong> módosított egy határidőt — Irodalom esszé</div>
+                  <div class="act-time">5 napja</div>
+                </div>
+              </div>
+
+              <div class="act-item">
+                <div class="act-icon-wrap">🎲</div>
+                <div class="act-body">
+                  <div class="act-text"><strong>Kovács Balázs</strong> lett kisorsolt — márc. 19-i Történelem felelés</div>
+                  <div class="act-time">6 napja</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div><!-- /.widget tevékenységek -->
+
+      </div><!-- /.dash-grid -->
+    </div><!-- /.dash-wrap -->
+  </div><!-- /#screen-dashboard -->
+
+
+  <!-- ════════════════════════════════════════════════════════
+       ACCOUNT SCREEN
+       ════════════════════════════════════════════════════════ -->
+  <div class="screen" id="screen-account">
+    <div class="app">
+      <div class="topbar">
+        <div class="brand">Oral <span>Draw</span></div>
+      </div>
+      <h2 style="font-family:var(--serif);font-size:1.8rem;margin-bottom:1.75rem;">Account</h2>
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Signed in as</div>
+        <div style="font-size:15px;font-weight:500;" id="acct-name"></div>
+        <div style="font-size:13px;color:var(--muted);margin-top:2px;" id="acct-email"></div>
+      </div>
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem;margin-bottom:1rem;">
+        <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Language</div>
+        <div class="lang-selector">
+          <button class="lang-btn active" id="lang-hu">🇭🇺 Magyar</button>
+          <button class="lang-btn" id="lang-en">🇬🇧 English</button>
+          <button class="lang-btn" id="lang-de">🇩🇪 Deutsch</button>
+        </div>
+      </div>
+      <button class="new-session-btn" style="margin-bottom:10px;" onclick="openPwModal()">Change password</button>
+      <button class="new-session-btn" style="border-color:rgba(192,96,96,0.3);color:var(--red);" onclick="logout()">Sign out</button>
+      <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:2rem;">All rights reserved. - Made by <a href="https://github.com/Bence0327" style="color:var(--accent);text-decoration:none;">Bence0327</a> - 2026</p>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════
+       BOTTOM NAV
+       ════════════════════════════════════════════════════════ -->
+  <nav class="bottom-nav" id="bottom-nav">
+
+    <!-- Dashboard — ez az oldal -->
+    <button class="nav-btn active" id="nav-dashboard" onclick="navTo('dashboard')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+
+    <!-- TODO: window.location.href = 'chat.html' -->
+    <button class="nav-btn" id="nav-chat" onclick="window.location.href='classchat/index.html'">
+      <span class="nav-icon">💬</span>
+      <span class="nav-label">Chat</span>
+    </button>
+
+    <!-- TODO: window.location.href = 'homework.html' -->
+    <button class="nav-btn" id="nav-hazi" onclick=" window.location.href='homeworks/index.html'">
+      <span class="nav-icon">📚</span>
+      <span class="nav-label">Házi</span>
+    </button>
+
+    <!-- TODO: window.location.href = 'index.html' (Oral Draw sorsolás) -->
+    <button class="nav-btn" id="nav-sorsolas" onclick="window.location.href='oraldraw/index.html'">
+      <span class="nav-icon">🎲</span>
+      <span class="nav-label">Sorsolás</span>
+    </button>
+
+    <!-- Fiók — account screen ezen az oldalon belül -->
+    <button class="nav-btn" id="nav-account" onclick="navTo('account')">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Fiók</span>
+    </button>
+
+  </nav>
+
+
+  <script>
+  // ─── APPWRITE CONFIG ────────────────────────────────────────
+  const APPWRITE_ENDPOINT = 'https://cloud.appwrite.io/v1';
+  const APPWRITE_PROJECT  = 'YOUR-APPWRITE-PROJECT-ID';
+
+  // ─── SDK INIT ───────────────────────────────────────────────
+  const { Client, Account } = Appwrite;
+  const client  = new Client().setEndpoint(APPWRITE_ENDPOINT).setProject(APPWRITE_PROJECT);
+  const account = new Account(client);
+
+  let currentUser = null;
+  let DEMO_MODE   = true;
+
+  const DEMO_USER = { $id: 'demo-me', name: 'Kovács Balázs', email: 'kovacs.balazs@feleles.local' };
+
+  // ─── UTILS ──────────────────────────────────────────────────
+  function showLoading() { document.getElementById('loading').classList.remove('hidden'); }
+  function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+
+  let _toastTimer;
+  function showToast(msg, dur = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function onLoggedIn() {
+    const name = currentUser.name || currentUser.email || '';
+
+    // Üdvözlés napszaktól függően
+    const h = new Date().getHours();
+    let greet = 'Jó napot';
+    if (h >= 5  && h < 10) greet = 'Jó reggelt';
+    else if (h >= 10 && h < 18) greet = 'Jó napot';
+    else if (h >= 18 && h < 22) greet = 'Jó estét';
+    else greet = 'Jó éjszakát';
+
+    const firstName = name.split(' ').pop();
+    document.getElementById('greeting').textContent = greet + ', ' + firstName + '!';
+
+    // Badge + account adatok
+    document.getElementById('user-badge').textContent = name || '⋯';
+    document.getElementById('acct-name').textContent  = name;
+    document.getElementById('acct-email').textContent = currentUser.email || '';
+
+    // Bottom nav megjelenítése
+    document.getElementById('bottom-nav').classList.add('visible');
+
+    showScreen('screen-dashboard');
+    hideLoading();
+  }
+
+  async function logout() {
+    if (!DEMO_MODE) {
+      try { await account.deleteSession('current'); } catch (_) {}
+    }
+    DEMO_MODE   = true;
+    currentUser = DEMO_USER;
+    onLoggedIn();
+  }
+
+  // ─── NAV ────────────────────────────────────────────────────
+  function navTo(section) {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('nav-' + section);
+    if (btn) btn.classList.add('active');
+
+    if (section === 'dashboard') showScreen('screen-dashboard');
+    if (section === 'account')   showScreen('screen-account');
+  }
+
+  // ─── EXPAND / COLLAPSE ───────────────────────────────────────
+  function toggleExpand(key) {
+    const content = document.getElementById(key + '-expand');
+    const btn     = document.getElementById(key + '-expand-btn');
+    const isOpen  = content.classList.contains('open');
+    content.classList.toggle('open', !isOpen);
+    btn.classList.toggle('open', !isOpen);
+  }
+
+  // ─── PASSWORD CHANGE ─────────────────────────────────────────
+  function openPwModal() {
+    document.getElementById('pw-modal').classList.add('open');
+  }
+  function closePwModal() {
+    document.getElementById('pw-modal').classList.remove('open');
+    document.getElementById('modal-err').textContent = '';
+    ['modal-old-pw', 'modal-new-pw', 'modal-confirm-pw']
+      .forEach(id => document.getElementById(id).value = '');
+  }
+  async function changePassword() {
+    const oldPw  = document.getElementById('modal-old-pw').value;
+    const newPw  = document.getElementById('modal-new-pw').value;
+    const confPw = document.getElementById('modal-confirm-pw').value;
+    const err    = document.getElementById('modal-err');
+    const btn    = document.getElementById('modal-save-btn');
+    err.textContent = '';
+    if (!oldPw || !newPw || !confPw) { err.textContent = 'Please fill in all fields.'; return; }
+    if (newPw !== confPw)            { err.textContent = 'Passwords do not match.'; return; }
+    if (newPw.length < 8)            { err.textContent = 'Password must be at least 8 characters.'; return; }
+    if (DEMO_MODE) { closePwModal(); showToast('Password changed (preview).'); return; }
+    btn.disabled = true;
+    try {
+      await account.updatePassword(newPw, oldPw);
+      closePwModal();
+      showToast('Password successfully changed.');
+    } catch (e) {
+      err.textContent = e.message || 'Something went wrong.';
+    } finally { btn.disabled = false; }
+  }
+
+  // ─── BOOT ────────────────────────────────────────────────────
+  (async () => {
+    showLoading();
+    currentUser = DEMO_USER;
+    onLoggedIn();
+  })();
+  </script>
+
+  <!-- ─── LANGUAGE SYSTEM ──────────────────────────────────────
+       Hozzáadva az eredeti kód érintése nélkül.
+       A lang-hu / lang-en / lang-de gombok már szerepelnek a
+       fiók képernyőn — itt kapják meg a setLang() hívást és
+       az összes fordítást.
+  ──────────────────────────────────────────────────────────── -->
+  <script>
+  // ─── FORDÍTÁSOK ──────────────────────────────────────────────
+  const LANGS = {
+    hu: {
+      // Login
+      login_eyebrow:        'Történelem · 9/G',
+      login_sub:            'Jelentkezz be az osztályfiókkal, hogy\njelentkezz a következő szóbeli felelésre.',
+      lbl_username:         'Felhasználónév',
+      lbl_password:         'Jelszó',
+      btn_signin:           'Bejelentkezés',
+      btn_preview:          'Megtekintés fiók nélkül →',
+      // Greeting napszakok
+      greet_morning:        'Jó reggelt',
+      greet_day:            'Jó napot',
+      greet_evening:        'Jó estét',
+      greet_night:          'Jó éjszakát',
+      // Widget fejlécek
+      widget_events:        'Közelgő események',
+      widget_messages:      'Üzenetek',
+      widget_activities:    'Legutóbbi tevékenységek',
+      // Expand gombok
+      expand_events:        'További események',
+      expand_messages:      'További üzenetek',
+      expand_activities:    'További tevékenységek',
+      // Nav
+      nav_dashboard:        'Dashboard',
+      nav_chat:             'Chat',
+      nav_hazi:             'Házi',
+      nav_sorsolas:         'Sorsolás',
+      nav_account:          'Fiók',
+      // Account képernyő
+      acct_title:           'Account',
+      acct_signed_in:       'Bejelentkezve',
+      lbl_language:         'Nyelv',
+      btn_changepw:         'Jelszó módosítása',
+      btn_signout:          'Kijelentkezés',
+      // Jelszócsere modal
+      pw_title:             'Jelszó módosítása',
+      pw_sub:               'Adj meg egy új jelszót a fiókodhoz.',
+      lbl_old_pw:           'Jelenlegi jelszó',
+      lbl_new_pw:           'Új jelszó',
+      lbl_new_pw_ph:        '8+ karakter',
+      lbl_confirm_pw:       'Új jelszó megerősítése',
+      lbl_confirm_pw_ph:    'ismételd meg az új jelszót',
+      btn_cancel:           'Mégse',
+      btn_save:             'Mentés',
+      // Hibaüzenetek
+      err_fill_fields:      'Kérjük töltsd ki az összes mezőt.',
+      err_pw_match:         'A két jelszó nem egyezik.',
+      err_pw_short:         'A jelszónak legalább 8 karakternek kell lennie.',
+      err_login_fields:     'Kérjük töltsd ki mindkét mezőt.',
+      err_login_fail:       'Bejelentkezés sikertelen. Ellenőrizd az adataidat.',
+      btn_signin_loading:   'Bejelentkezés…',
+      toast_pw_changed:     'Jelszó sikeresen megváltoztatva.',
+      toast_pw_preview:     'Jelszó megváltoztatva (előnézet).',
+    },
+    en: {
+      login_eyebrow:        'History · 9/G',
+      login_sub:            'Sign in with your class account to volunteer\nfor the next oral presentation.',
+      lbl_username:         'Username',
+      lbl_password:         'Password',
+      btn_signin:           'Sign in',
+      btn_preview:          'Preview without account →',
+      greet_morning:        'Good morning',
+      greet_day:            'Good afternoon',
+      greet_evening:        'Good evening',
+      greet_night:          'Good night',
+      widget_events:        'Upcoming events',
+      widget_messages:      'Messages',
+      widget_activities:    'Recent activity',
+      expand_events:        'More events',
+      expand_messages:      'More messages',
+      expand_activities:    'More activity',
+      nav_dashboard:        'Dashboard',
+      nav_chat:             'Chat',
+      nav_hazi:             'Homework',
+      nav_sorsolas:         'Draw',
+      nav_account:          'Account',
+      acct_title:           'Account',
+      acct_signed_in:       'Signed in as',
+      lbl_language:         'Language',
+      btn_changepw:         'Change password',
+      btn_signout:          'Sign out',
+      pw_title:             'Change password',
+      pw_sub:               'Choose a new password for your account.',
+      lbl_old_pw:           'Current password',
+      lbl_new_pw:           'New password',
+      lbl_new_pw_ph:        '8+ characters',
+      lbl_confirm_pw:       'Confirm new password',
+      lbl_confirm_pw_ph:    'repeat new password',
+      btn_cancel:           'Cancel',
+      btn_save:             'Save',
+      err_fill_fields:      'Please fill in all fields.',
+      err_pw_match:         'Passwords do not match.',
+      err_pw_short:         'Password must be at least 8 characters.',
+      err_login_fields:     'Please fill in both fields.',
+      err_login_fail:       'Login failed. Check your credentials.',
+      btn_signin_loading:   'Signing in…',
+      toast_pw_changed:     'Password successfully changed.',
+      toast_pw_preview:     'Password changed (preview).',
+    },
+    de: {
+      login_eyebrow:        'Geschichte · 9/G',
+      login_sub:            'Melde dich mit deinem Klassenkonto an,\num dich für die nächste mündliche Prüfung zu melden.',
+      lbl_username:         'Benutzername',
+      lbl_password:         'Passwort',
+      btn_signin:           'Anmelden',
+      btn_preview:          'Vorschau ohne Konto →',
+      greet_morning:        'Guten Morgen',
+      greet_day:            'Guten Tag',
+      greet_evening:        'Guten Abend',
+      greet_night:          'Gute Nacht',
+      widget_events:        'Bevorstehende Ereignisse',
+      widget_messages:      'Nachrichten',
+      widget_activities:    'Letzte Aktivitäten',
+      expand_events:        'Weitere Ereignisse',
+      expand_messages:      'Weitere Nachrichten',
+      expand_activities:    'Weitere Aktivitäten',
+      nav_dashboard:        'Dashboard',
+      nav_chat:             'Chat',
+      nav_hazi:             'Hausaufgaben',
+      nav_sorsolas:         'Ziehung',
+      nav_account:          'Konto',
+      acct_title:           'Konto',
+      acct_signed_in:       'Angemeldet als',
+      lbl_language:         'Sprache',
+      btn_changepw:         'Passwort ändern',
+      btn_signout:          'Abmelden',
+      pw_title:             'Passwort ändern',
+      pw_sub:               'Wähle ein neues Passwort für dein Konto.',
+      lbl_old_pw:           'Aktuelles Passwort',
+      lbl_new_pw:           'Neues Passwort',
+      lbl_new_pw_ph:        '8+ Zeichen',
+      lbl_confirm_pw:       'Neues Passwort bestätigen',
+      lbl_confirm_pw_ph:    'neues Passwort wiederholen',
+      btn_cancel:           'Abbrechen',
+      btn_save:             'Speichern',
+      err_fill_fields:      'Bitte alle Felder ausfüllen.',
+      err_pw_match:         'Die Passwörter stimmen nicht überein.',
+      err_pw_short:         'Das Passwort muss mindestens 8 Zeichen lang sein.',
+      err_login_fields:     'Bitte beide Felder ausfüllen.',
+      err_login_fail:       'Anmeldung fehlgeschlagen. Überprüfe deine Daten.',
+      btn_signin_loading:   'Anmelden…',
+      toast_pw_changed:     'Passwort erfolgreich geändert.',
+      toast_pw_preview:     'Passwort geändert (Vorschau).',
+    }
+  };
+
+  // ─── AKTUÁLIS NYELV ───────────────────────────────────────────
+  let currentLang = localStorage.getItem('dash-lang') || 'hu';
+
+  function t(key) {
+    return (LANGS[currentLang] && LANGS[currentLang][key]) || (LANGS['hu'][key]) || key;
+  }
+
+  // ─── NYELV ALKALMAZÁSA ────────────────────────────────────────
+  function applyLang() {
+    const l = currentLang;
+
+    // HTML lang attribútum
+    document.documentElement.lang = l;
+
+    // Widget fejlécek (sorrend: események, üzenetek, tevékenységek)
+    const wTitles = document.querySelectorAll('.widget-title');
+    if (wTitles[0]) wTitles[0].textContent = t('widget_events');
+    if (wTitles[1]) wTitles[1].textContent = t('widget_messages');
+    if (wTitles[2]) wTitles[2].textContent = t('widget_activities');
+
+    // Expand gombok belső span-je (sorrend: events, msgs, acts)
+    const expBtns = document.querySelectorAll('.expand-btn');
+    if (expBtns[0]) expBtns[0].querySelector('span:first-child').textContent = t('expand_events');
+    if (expBtns[1]) expBtns[1].querySelector('span:first-child').textContent = t('expand_messages');
+    if (expBtns[2]) expBtns[2].querySelector('span:first-child').textContent = t('expand_activities');
+
+    // Nav gombok label-jei
+    const navDash = document.getElementById('nav-dashboard');
+    if (navDash) navDash.querySelector('.nav-label').textContent = t('nav_dashboard');
+    const navChat = document.getElementById('nav-chat');
+    if (navChat) navChat.querySelector('.nav-label').textContent = t('nav_chat');
+    const navHazi = document.getElementById('nav-hazi');
+    if (navHazi) navHazi.querySelector('.nav-label').textContent = t('nav_hazi');
+    const navSors = document.getElementById('nav-sorsolas');
+    if (navSors) navSors.querySelector('.nav-label').textContent = t('nav_sorsolas');
+    const navAcct = document.getElementById('nav-account');
+    if (navAcct) navAcct.querySelector('.nav-label').textContent = t('nav_account');
+
+    // Account képernyő
+    const acctH2 = document.querySelector('#screen-account h2');
+    if (acctH2) acctH2.textContent = t('acct_title');
+
+    const acctSignedIn = document.querySelector('#screen-account [style*="13px"][style*="muted"], #screen-account div > div:first-child');
+    // Pontosabb: az "Signed in as" szöveg az első div a kártyán belül
+    const acctCard = document.querySelector('#screen-account .app > div:first-of-type > div:first-child');
+    if (acctCard) acctCard.textContent = t('acct_signed_in');
+
+    const langLabel = document.querySelector('#screen-account .app > div:nth-of-type(2) > div:first-child');
+    if (langLabel) langLabel.textContent = t('lbl_language');
+
+    const btnChangePw = document.querySelector('#screen-account .new-session-btn:first-of-type');
+    if (btnChangePw) btnChangePw.textContent = t('btn_changepw');
+
+    const btnSignout = document.querySelector('#screen-account .new-session-btn:last-of-type');
+    if (btnSignout) btnSignout.textContent = t('btn_signout');
+
+    // Jelszócsere modal
+    const pwTitle = document.querySelector('#pw-modal .modal-title');
+    if (pwTitle) pwTitle.textContent = t('pw_title');
+
+    const pwSub = document.querySelector('#pw-modal .modal-sub');
+    if (pwSub) pwSub.textContent = t('pw_sub');
+
+    // Modal label-ek (sorrend: current pw, new pw, confirm pw)
+    const modalLbls = document.querySelectorAll('#pw-modal .field label');
+    if (modalLbls[0]) modalLbls[0].textContent = t('lbl_old_pw');
+    if (modalLbls[1]) modalLbls[1].textContent = t('lbl_new_pw');
+    if (modalLbls[2]) modalLbls[2].textContent = t('lbl_confirm_pw');
+
+    const newPwInput = document.getElementById('modal-new-pw');
+    if (newPwInput) newPwInput.placeholder = t('lbl_new_pw_ph');
+
+    const confPwInput = document.getElementById('modal-confirm-pw');
+    if (confPwInput) confPwInput.placeholder = t('lbl_confirm_pw_ph');
+
+    const pwCancel = document.querySelector('#pw-modal .btn-ghost');
+    if (pwCancel) pwCancel.textContent = t('btn_cancel');
+
+    const pwSave = document.getElementById('modal-save-btn');
+    if (pwSave && !pwSave.disabled) pwSave.textContent = t('btn_save');
+
+    // Üdvözlés frissítése, ha a dashboard aktív
+    if (currentUser) {
+      const h = new Date().getHours();
+      let greetKey = 'greet_day';
+      if (h >= 5  && h < 10) greetKey = 'greet_morning';
+      else if (h >= 10 && h < 18) greetKey = 'greet_day';
+      else if (h >= 18 && h < 22) greetKey = 'greet_evening';
+      else greetKey = 'greet_night';
+      const name = currentUser.name || currentUser.email || '';
+      const firstName = name.split(' ').pop();
+      const greetEl = document.getElementById('greeting');
+      if (greetEl) greetEl.textContent = t(greetKey) + ', ' + firstName + '!';
+    }
+
+    // Lang gombok aktív állapota
+    ['hu', 'en', 'de'].forEach(code => {
+      const btn = document.getElementById('lang-' + code);
+      if (btn) btn.classList.toggle('active', code === l);
+    });
+  }
+
+  // ─── NYELV BEÁLLÍTÁSA ─────────────────────────────────────────
+  function setLang(l) {
+    if (!LANGS[l]) return;
+    currentLang = l;
+    localStorage.setItem('dash-lang', l);
+    applyLang();
+  }
+
+  // ─── LANG GOMB CLICK HOZZÁRENDELÉS ───────────────────────────
+  // (onclick attribútumot nem adunk hozzá — JS event listener-rel oldjuk meg)
+  document.addEventListener('DOMContentLoaded', () => {
+    ['hu', 'en', 'de'].forEach(code => {
+      const btn = document.getElementById('lang-' + code);
+      if (btn) btn.addEventListener('click', () => setLang(code));
+    });
+  });
+
+  // ─── BOOT: NYELV ALKALMAZÁSA ──────────────────────────────────
+  // Az oldalletöltés után azonnal alkalmazzuk a mentett nyelvet.
+  // A DOMContentLoaded-re rakjuk, hogy biztosan minden elem létezzen.
+  document.addEventListener('DOMContentLoaded', () => {
+    applyLang();
+  });
+  </script>
+
+</body>
+</html>
+<!-- All rights reserved. - Made by Bence0327 (https://github.com/Bence0327) - 2026 -->
