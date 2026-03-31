@@ -119,7 +119,7 @@ A dashboard egy egységes hub, ahol a diákok egy helyről érik el az összes a
 - Konzisztens vizuális stílus
 
 ---
-Csapatunk:
+## Csapatunk:
 Bence0327 - Molnár Bence
 SPARFahejasCsiga - Ivanovics Emma
 QuaternionDev - Südi Balázs
